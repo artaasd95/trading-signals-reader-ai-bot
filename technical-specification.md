@@ -64,17 +64,22 @@ Security:
 #### Frontend Technologies
 ```yaml
 Web Dashboard:
-  - React 18+
+  - Vue.js 3.3+
   - TypeScript 5.0+
-  - Material-UI 5.14+
-  - Chart.js 4.0+ (Trading charts)
-  - WebSocket client for real-time updates
+  - Vuetify 3.4+ (Material Design)
+  - Pinia 2.1+ (State management)
+  - Vue Router 4.2+
+  - Chart.js 4.0+ / ApexCharts (Trading charts)
+  - Socket.io-client (WebSocket)
+  - Vite 4.0+ (Build tool)
 
 Mobile App:
-  - React Native 0.72+
+  - Vue.js 3.3+
+  - Quasar Framework 2.14+
   - TypeScript 5.0+
-  - React Navigation 6+
+  - Capacitor 5.0+ (Native features)
   - Push notifications
+  - Cordova plugins
 
 Telegram Integration:
   - python-telegram-bot 20.5+

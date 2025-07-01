@@ -5,7 +5,7 @@
 **Project Name**: AI-Powered Crypto Trading Signals Bot  
 **Repository**: trading-signals-reader-ai-bot  
 **Architecture**: Microservices with Event-Driven Design  
-**Primary Technology Stack**: Python, FastAPI, React, PostgreSQL, Redis  
+**Primary Technology Stack**: Python, FastAPI, Vue.js, PostgreSQL, Redis  
 
 ## Quick Start Guide
 
@@ -41,7 +41,7 @@ venv\Scripts\activate  # Windows
 
 # Install dependencies
 pip install -r requirements.txt
-npm install  # For frontend dependencies
+npm install  # For Vue.js frontend dependencies
 ```
 
 #### 2. Environment Configuration
@@ -115,8 +115,9 @@ trading-signals-reader-ai-bot/
 │       └── notifications.py   # Notification system
 ├── frontend/
 │   ├── src/
-│   │   ├── components/        # React components
-│   │   ├── pages/             # Application pages
+│   │   ├── components/        # Vue components
+│   │   ├── views/             # Application pages
+│   │   ├── stores/            # Pinia stores
 │   │   ├── services/          # API service calls
 │   │   └── utils/             # Frontend utilities
 │   ├── package.json

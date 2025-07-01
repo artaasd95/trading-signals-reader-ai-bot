@@ -8,8 +8,8 @@
 | Layer | Component | Technology | Responsibility |
 |-------|-----------|------------|----------------|
 | **Interface** | Telegram Bot | Python Telegram Bot API | Natural language command processing, notifications |
-| **Interface** | Web Dashboard | React.js + TypeScript | Portfolio monitoring, trade history, settings |
-| **Interface** | Mobile App | React Native | Mobile portfolio access, alerts |
+| **Interface** | Web Dashboard | Vue.js 3 + TypeScript | Portfolio monitoring, trade history, settings |
+| **Interface** | Mobile App | Vue.js 3 + Quasar | Cross-platform mobile app with native feel |
 | **Gateway** | API Gateway | FastAPI + Nginx | Request routing, rate limiting, authentication |
 | **Core** | AI Command Processor | OpenAI GPT-4 + Custom NLP | Natural language understanding, trade intent extraction |
 | **Core** | Trading Engine | Python + CCXT | Order execution, position management |
@@ -70,7 +70,7 @@ flowchart TD
 - **Integration**: Direct connection to AI Command Processor
 
 #### Web Dashboard
-- **Technology**: React.js with TypeScript, Material-UI
+- **Technology**: Vue.js 3 with TypeScript, Vuetify
 - **Features**:
   - Real-time portfolio overview
   - Trade history and analytics
@@ -79,7 +79,7 @@ flowchart TD
 - **API**: RESTful API through API Gateway
 
 #### Mobile Application
-- **Technology**: React Native
+- **Technology**: Vue.js 3 + Quasar Framework
 - **Features**:
   - Portfolio monitoring
   - Push notifications
