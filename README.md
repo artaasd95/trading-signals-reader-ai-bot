@@ -1,0 +1,1 @@
+# trading-signals-reader-ai-bot
