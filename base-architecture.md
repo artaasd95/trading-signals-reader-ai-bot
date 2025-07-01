@@ -1,7 +1,9 @@
 # Crypto Trading Bot System Architecture
 
 ## System Overview
-**Purpose**: AI-powered cryptocurrency trading bot that processes natural language commands via Telegram, executes trades across multiple exchanges, and provides intelligent portfolio management with real-time monitoring.
+**Purpose**: AI-powered cryptocurrency trading bot that connects to external exchanges via CCXT, processes natural language commands via Telegram, executes trades by sending orders to exchanges, and provides intelligent portfolio management with real-time monitoring.
+
+**Important Note**: This system is NOT an exchange. It does not generate order books, perform order matching, or handle exchange-level operations. Instead, it acts as an intelligent trading client that connects to existing cryptocurrency exchanges using the CCXT library to load market data and send trading orders.
 
 ## Components
 
@@ -101,10 +103,11 @@ flowchart TD
 #### Trading Engine
 - **Technology**: Python with asyncio, CCXT library
 - **Functions**:
-  - Order execution across multiple exchanges
-  - Position tracking and management
-  - Take profit and stop loss implementation
-  - Slippage management
+  - Order placement to external exchanges via CCXT
+  - Multi-exchange price comparison and routing
+  - Position tracking and P&L calculation from exchange data
+  - Risk management and position sizing before order submission
+  - Order status monitoring and synchronization with exchanges
 - **Features**:
   - Multi-exchange order routing
   - Smart order splitting
@@ -198,21 +201,23 @@ market_data:{symbol}:{timeframe} -> [{"timestamp": 1640995200, "open": 45000, "h
 
 ### 4. Integration Layer
 
-#### Exchange Connectors
-- **Supported Exchanges**: Binance, Coinbase Pro, Kraken, Bybit
-- **Protocols**: REST API + WebSocket
+#### Exchange Connectors (via CCXT)
+- **Supported Exchanges**: Binance, Coinbase Pro, Kraken, Bybit, and 100+ others via CCXT
+- **Protocols**: REST API + WebSocket (through CCXT abstraction)
 - **Functions**:
-  - Real-time market data streaming
-  - Order placement and management
-  - Account balance retrieval
-  - Trade history synchronization
+  - Real-time market data fetching from exchanges
+  - Order submission to exchange APIs
+  - Account balance retrieval from exchanges
+  - Trade history synchronization from exchange APIs
+  - Order book data fetching (read-only)
+  - Exchange-specific API rate limit management
 
 #### Message Queue Architecture
 ```python
 # Celery Task Definitions
 @celery.task
-def execute_trade_order(user_id, order_data):
-    # Process trade execution
+def submit_trade_order(user_id, order_data):
+    # Submit trade order to external exchange via CCXT
     pass
 
 @celery.task
@@ -250,11 +255,20 @@ def send_telegram_notification(chat_id, message):
 - **Audit Logging**: Complete transaction audit trail
 
 ### Scalability
-- **Horizontal Scaling**: Microservices architecture
-- **Load Balancing**: Nginx with multiple API instances
-- **Database Scaling**: Read replicas for PostgreSQL
-- **Cache Strategy**: Redis cluster for high availability
-- **Auto-scaling**: Kubernetes deployment with HPA
+
+#### Microservices Architecture
+- **Service Decomposition**: 16 independent microservices
+- **Independent Scaling**: Each service scales based on its own metrics
+- **Technology Diversity**: Services can use optimal tech stacks
+- **Fault Isolation**: Service failures don't cascade
+
+#### Azure Scaling Strategy
+- **Container Apps**: Auto-scale based on CPU, memory, and queue depth
+- **Azure Functions**: Event-driven scaling for notifications and batch processing
+- **Load Balancing**: Azure Application Gateway with WAF
+- **Database Scaling**: Azure SQL Database with read replicas and elastic pools
+- **Cache Strategy**: Azure Cache for Redis with zone redundancy
+- **Global Distribution**: Azure CDN for static content and API responses
 
 ### Recovery & Reliability
 - **Backup Strategy**: 
@@ -274,9 +288,56 @@ def send_telegram_notification(chat_id, message):
 
 ## Deployment Architecture
 
-### Production Environment
+### Azure Container Apps Deployment (Recommended)
 ```yaml
-# Kubernetes Deployment Structure
+# Azure Container Apps Configuration
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading-engine
+  namespace: trading-system
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: trading-engine
+  template:
+    metadata:
+      labels:
+        app: trading-engine
+        version: v1
+    spec:
+      containers:
+      - name: trading-engine
+        image: tradingbot.azurecr.io/trading-engine:latest
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        env:
+        - name: AZURE_SQL_CONNECTION
+          valueFrom:
+            secretKeyRef:
+              name: azure-secrets
+              key: sql-connection
+        - name: AZURE_KEYVAULT_URL
+          value: "https://trading-bot-kv.vault.azure.net/"
+        ports:
+        - containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+```
+
+### Alternative Kubernetes Deployment
+```yaml
+# Self-hosted Kubernetes option
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -310,10 +371,20 @@ spec:
 ```
 
 ### Infrastructure Requirements
+
+#### On-Premises/Self-Hosted
 - **Compute**: 4 vCPU, 16GB RAM minimum for production
 - **Storage**: SSD storage for databases, 1TB minimum
 - **Network**: Low-latency connection to exchange APIs
 - **Redundancy**: Multi-AZ deployment for high availability
+
+#### Azure Cloud-Native (Recommended)
+- **Compute**: Azure Container Apps with auto-scaling (2-8 vCPU per service)
+- **Storage**: Azure SQL Database + Azure Blob Storage + Azure Data Explorer
+- **Network**: Azure Virtual Network with ExpressRoute for low latency
+- **Redundancy**: Multi-region deployment (Primary: East US 2, Secondary: West US 2)
+- **Security**: Azure Key Vault + Azure AD B2C + Azure Security Center
+- **Monitoring**: Azure Monitor + Application Insights + Log Analytics
 
 ## API Specifications
 

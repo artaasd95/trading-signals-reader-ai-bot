@@ -430,7 +430,7 @@ class TradingEngine:
                         error=f"No available exchange for symbol {order_request.symbol}"
                     )
             
-            # Step 3: Order execution
+            # Step 3: Order submission to exchange
             exchange_order = await self._execute_on_exchange(exchange, order_request)
             
             # Step 4: Position tracking
@@ -461,7 +461,7 @@ class TradingEngine:
             )
             
         except Exception as e:
-            error_msg = f"Order execution failed: {str(e)}"
+            error_msg = f"Order submission to exchange failed: {str(e)}"
             await self.notification_service.send_error_notification(
                 user_id=order_request.user_id,
                 error=error_msg
@@ -486,7 +486,7 @@ class TradingEngine:
     
     async def _update_position(self, order_request: OrderRequest, exchange_order: Dict[str, Any]):
         """
-        Update user position after order execution
+       # Update user position after order submission to exchange
         """
         # Implementation for position tracking
         pass

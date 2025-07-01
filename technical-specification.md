@@ -7,6 +7,7 @@
 **Target Platform**: Multi-platform (Web, Mobile, Telegram)  
 **Primary Language**: Python 3.11+  
 **Architecture**: Microservices with Event-Driven Design  
+**Exchange Integration**: CCXT-based client connecting to external exchanges (NOT an exchange itself)  
 
 ## Technical Requirements
 
@@ -151,16 +152,16 @@ class TradingEngine:
         self.risk_manager = RiskManager()
         self.position_manager = PositionManager()
     
-    async def execute_order(self, order: OrderRequest) -> OrderResult:
-        # Pre-execution validation
+    async def submit_order_to_exchange(self, order: OrderRequest) -> OrderResult:
+        # Pre-submission validation
         validation_result = await self.risk_manager.validate_order(order)
         if not validation_result.is_valid:
             raise OrderValidationError(validation_result.reason)
         
-        # Exchange selection
+        # Exchange selection (best price/liquidity)
         best_exchange = await self.select_best_exchange(order.symbol)
         
-        # Order execution
+        # Order submission to external exchange via CCXT
         try:
             exchange_order = await best_exchange.create_order(
                 symbol=order.symbol,
@@ -170,11 +171,11 @@ class TradingEngine:
                 price=order.price
             )
             
-            # Position tracking
-            await self.position_manager.update_position(exchange_order)
+            # Track order status from exchange response
+            await self.position_manager.track_order_status(exchange_order)
             
             # Notification
-            await self.notify_order_execution(exchange_order)
+            await self.notify_order_submission(exchange_order)
             
             return OrderResult(success=True, order_id=exchange_order['id'])
             
@@ -183,14 +184,15 @@ class TradingEngine:
             return OrderResult(success=False, error=str(e))
 ```
 
-#### Exchange Integration
+#### Exchange Integration (CCXT Client)
 ```python
 class ExchangeManager:
+    """Manages connections to external exchanges via CCXT library"""
     SUPPORTED_EXCHANGES = {
         'binance': {
             'class': ccxt.binance,
             'features': ['spot', 'futures', 'options'],
-            'rate_limit': 1200,  # requests per minute
+            'rate_limit': 1200,  # requests per minute to exchange API
             'min_order_size': {
                 'BTC': 0.00001,
                 'ETH': 0.0001,
@@ -640,7 +642,7 @@ class TestTradingEngine:
         return TradingEngine()
     
     @pytest.mark.asyncio
-    async def test_order_execution_success(self, trading_engine):
+    async def test_order_submission_success(self, trading_engine):
         # Mock exchange response
         mock_exchange = Mock()
         mock_exchange.create_order.return_value = {

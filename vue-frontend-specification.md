@@ -403,13 +403,14 @@ export const useTradingStore = defineStore('trading', () => {
   }
   
   const fetchOrderBook = async (symbol: string) => {
-    try {
-      const response = await api.get(`/market/orderbook/${symbol}`)
-      orderBook.value = response.data
-    } catch (error) {
-      console.error('Failed to fetch order book:', error)
-    }
+  try {
+    // Fetch order book data from external exchange via our API
+    const response = await api.get(`/market/orderbook/${symbol}`)
+    orderBook.value = response.data
+  } catch (error) {
+    console.error('Failed to fetch order book from exchange:', error)
   }
+}
   
   return {
     // State
