@@ -1,0 +1,92 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'trading-bot-monitor'
+
+rule_files:
+  - "alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 5s
+    metrics_path: /metrics
+
+  # Trading Bot API
+  - job_name: 'trading-bot-api'
+    static_configs:
+      - targets: ['api:8000']
+    scrape_interval: 10s
+    metrics_path: /metrics
+    scrape_timeout: 5s
+
+  # PostgreSQL Database
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['db:5432']
+    scrape_interval: 30s
+
+  # Redis Cache
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+
+  # InfluxDB
+  - job_name: 'influxdb'
+    static_configs:
+      - targets: ['influxdb:8086']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # RabbitMQ
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['rabbitmq:15692']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Nginx
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:80']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Node Exporter (if added)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+
+  # Celery Workers
+  - job_name: 'celery-worker'
+    static_configs:
+      - targets: ['worker:8001']
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  # Custom application metrics
+  - job_name: 'trading-metrics'
+    static_configs:
+      - targets: ['api:8000']
+    scrape_interval: 10s
+    metrics_path: /api/v1/metrics
+    scrape_timeout: 5s
+
+  # Exchange API health checks
+  - job_name: 'exchange-health'
+    static_configs:
+      - targets: ['api:8000']
+    scrape_interval: 60s
+    metrics_path: /api/v1/health/exchanges
+    scrape_timeout: 10s

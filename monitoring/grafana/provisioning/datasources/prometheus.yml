@@ -1,0 +1,30 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: 15s
+      queryTimeout: 60s
+      httpMethod: POST
+    secureJsonData: {}
+
+  - name: InfluxDB
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    database: market-data
+    user: admin
+    secureJsonData:
+      password: password
+    jsonData:
+      version: Flux
+      organization: trading-bot
+      defaultBucket: market-data
+      tlsSkipVerify: true
+    secureJsonData:
+      token: my-super-secret-auth-token

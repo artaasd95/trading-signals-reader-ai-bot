@@ -1,0 +1,324 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (Development)
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: trading-bot-postgres-dev
+    environment:
+      POSTGRES_DB: trading_bot_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    networks:
+      - trading-dev-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache (Development)
+  redis-dev:
+    image: redis:7-alpine
+    container_name: trading-bot-redis-dev
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    networks:
+      - trading-dev-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # InfluxDB for Time Series Data (Development)
+  influxdb-dev:
+    image: influxdb:2.7-alpine
+    container_name: trading-bot-influxdb-dev
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: influxdb123
+      DOCKER_INFLUXDB_INIT_ORG: trading-org-dev
+      DOCKER_INFLUXDB_INIT_BUCKET: trading-data-dev
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: dev-trading-token-123
+    volumes:
+      - influxdb_dev_data:/var/lib/influxdb2
+      - influxdb_dev_config:/etc/influxdb2
+    ports:
+      - "8087:8086"  # Different port to avoid conflicts
+    networks:
+      - trading-dev-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ Message Broker (Development)
+  rabbitmq-dev:
+    image: rabbitmq:3.12-management-alpine
+    container_name: trading-bot-rabbitmq-dev
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: rabbitmq123
+      RABBITMQ_DEFAULT_VHOST: trading-dev
+    volumes:
+      - rabbitmq_dev_data:/var/lib/rabbitmq
+    ports:
+      - "5673:5672"   # Different port to avoid conflicts
+      - "15673:15672" # Management UI
+    networks:
+      - trading-dev-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (Development with hot reload)
+  backend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: trading-bot-backend-dev
+    environment:
+      # Database
+      DATABASE_URL: postgresql://postgres:postgres123@postgres-dev:5432/trading_bot_dev
+      
+      # Redis
+      REDIS_URL: redis://redis-dev:6379/0
+      
+      # InfluxDB
+      INFLUXDB_URL: http://influxdb-dev:8086
+      INFLUXDB_TOKEN: dev-trading-token-123
+      INFLUXDB_ORG: trading-org-dev
+      INFLUXDB_BUCKET: trading-data-dev
+      
+      # RabbitMQ
+      RABBITMQ_URL: amqp://admin:rabbitmq123@rabbitmq-dev:5672/trading-dev
+      
+      # Development settings
+      ENVIRONMENT: development
+      DEBUG: true
+      RELOAD: true
+      
+      # API Keys (use test/sandbox keys for development)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      BINANCE_API_KEY: ${BINANCE_API_KEY:-}
+      BINANCE_SECRET_KEY: ${BINANCE_SECRET_KEY:-}
+      
+      # Security (use simple keys for development)
+      SECRET_KEY: dev-secret-key-not-for-production
+      JWT_SECRET_KEY: dev-jwt-secret-key
+      
+      # Paper trading mode for development
+      PAPER_TRADING_MODE: true
+      
+    volumes:
+      - ./backend:/app
+      - ./backend/logs:/app/logs
+      - ./backend/data:/app/data
+    ports:
+      - "8001:8000"  # Different port for development
+    networks:
+      - trading-dev-network
+    depends_on:
+      postgres-dev:
+        condition: service_healthy
+      redis-dev:
+        condition: service_healthy
+      influxdb-dev:
+        condition: service_healthy
+      rabbitmq-dev:
+        condition: service_healthy
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Celery Worker (Development)
+  celery-worker-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: trading-bot-celery-worker-dev
+    command: celery -A app.celery worker --loglevel=debug --concurrency=2
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres123@postgres-dev:5432/trading_bot_dev
+      REDIS_URL: redis://redis-dev:6379/0
+      INFLUXDB_URL: http://influxdb-dev:8086
+      INFLUXDB_TOKEN: dev-trading-token-123
+      INFLUXDB_ORG: trading-org-dev
+      INFLUXDB_BUCKET: trading-data-dev
+      RABBITMQ_URL: amqp://admin:rabbitmq123@rabbitmq-dev:5672/trading-dev
+      ENVIRONMENT: development
+      DEBUG: true
+      PAPER_TRADING_MODE: true
+      SECRET_KEY: dev-secret-key-not-for-production
+      JWT_SECRET_KEY: dev-jwt-secret-key
+    volumes:
+      - ./backend:/app
+      - ./backend/logs:/app/logs
+      - ./backend/data:/app/data
+    networks:
+      - trading-dev-network
+    depends_on:
+      postgres-dev:
+        condition: service_healthy
+      redis-dev:
+        condition: service_healthy
+      rabbitmq-dev:
+        condition: service_healthy
+      backend-dev:
+        condition: service_started
+    restart: unless-stopped
+
+  # Celery Beat Scheduler (Development)
+  celery-beat-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: trading-bot-celery-beat-dev
+    command: celery -A app.celery beat --loglevel=debug
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres123@postgres-dev:5432/trading_bot_dev
+      REDIS_URL: redis://redis-dev:6379/0
+      RABBITMQ_URL: amqp://admin:rabbitmq123@rabbitmq-dev:5672/trading-dev
+      ENVIRONMENT: development
+      DEBUG: true
+      SECRET_KEY: dev-secret-key-not-for-production
+      JWT_SECRET_KEY: dev-jwt-secret-key
+    volumes:
+      - ./backend:/app
+      - ./backend/logs:/app/logs
+      - ./backend/data:/app/data
+    networks:
+      - trading-dev-network
+    depends_on:
+      postgres-dev:
+        condition: service_healthy
+      redis-dev:
+        condition: service_healthy
+      rabbitmq-dev:
+        condition: service_healthy
+      backend-dev:
+        condition: service_started
+    restart: unless-stopped
+
+  # Frontend Development Server
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: trading-bot-frontend-dev
+    environment:
+      REACT_APP_API_URL: http://localhost:8001
+      REACT_APP_WS_URL: ws://localhost:8001
+      CHOKIDAR_USEPOLLING: true
+      WATCHPACK_POLLING: true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3001:3000"  # Different port for development
+    networks:
+      - trading-dev-network
+    depends_on:
+      - backend-dev
+    restart: unless-stopped
+    command: npm start
+
+  # Mailhog for Email Testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: trading-bot-mailhog
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - trading-dev-network
+    restart: unless-stopped
+
+  # Redis Commander for Redis Management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: trading-bot-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis-dev:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - trading-dev-network
+    depends_on:
+      - redis-dev
+    restart: unless-stopped
+
+  # pgAdmin for PostgreSQL Management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: trading-bot-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@trading-bot.local
+      PGADMIN_DEFAULT_PASSWORD: pgadmin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    networks:
+      - trading-dev-network
+    depends_on:
+      - postgres-dev
+    restart: unless-stopped
+
+  # Flower for Celery Monitoring
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: trading-bot-flower
+    command: celery -A app.celery flower --port=5555
+    environment:
+      REDIS_URL: redis://redis-dev:6379/0
+      RABBITMQ_URL: amqp://admin:rabbitmq123@rabbitmq-dev:5672/trading-dev
+    ports:
+      - "5555:5555"
+    networks:
+      - trading-dev-network
+    depends_on:
+      - redis-dev
+      - rabbitmq-dev
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  influxdb_dev_data:
+    driver: local
+  influxdb_dev_config:
+    driver: local
+  rabbitmq_dev_data:
+    driver: local
+  pgadmin_dev_data:
+    driver: local
+
+networks:
+  trading-dev-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
