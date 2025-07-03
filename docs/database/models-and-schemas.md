@@ -1,0 +1,609 @@
+# Database Models and Schemas
+
+This document provides comprehensive documentation for all database models and their relationships in the Trading Signals Reader AI Bot system.
+
+## Table of Contents
+
+1. [Base Model](#base-model)
+2. [User Management Models](#user-management-models)
+3. [Trading Models](#trading-models)
+4. [AI and Machine Learning Models](#ai-and-machine-learning-models)
+5. [Market Data Models](#market-data-models)
+6. [Telegram Integration Models](#telegram-integration-models)
+7. [Model Relationships](#model-relationships)
+8. [Database Indexes and Constraints](#database-indexes-and-constraints)
+
+## Base Model
+
+### Base Class
+
+All models inherit from a common `Base` class that provides:
+
+- **UUID Primary Key**: All entities use UUID as primary keys for better scalability
+- **Timestamps**: Automatic `created_at` and `updated_at` tracking
+- **Utility Methods**: Dictionary conversion, string representation, and table name generation
+
+```python
+class Base:
+    id: UUID (Primary Key)
+    created_at: DateTime (Auto-generated)
+    updated_at: DateTime (Auto-updated)
+```
+
+## User Management Models
+
+### User Model
+
+The central user model manages authentication, profile information, and trading preferences.
+
+#### Fields
+
+**Authentication & Identity**
+- `email`: Unique email address (required)
+- `username`: Unique username (optional)
+- `hashed_password`: Securely hashed password
+- `phone_number`: User's phone number
+
+**Profile Information**
+- `first_name`: User's first name
+- `last_name`: User's last name
+- `timezone`: User's timezone (default: UTC)
+- `locale`: User's locale preference
+
+**Account Status & Security**
+- `user_role`: Enum (USER, ADMIN, MODERATOR)
+- `user_status`: Enum (ACTIVE, INACTIVE, SUSPENDED, PENDING_VERIFICATION)
+- `is_active`: Boolean flag for account status
+- `is_superuser`: Administrative privileges flag
+- `is_verified`: Email verification status
+- `verification_token`: Token for email verification
+- `failed_login_attempts`: Counter for security
+- `locked_until`: Account lock expiration timestamp
+- `last_login`: Last successful login timestamp
+
+**Trading Preferences**
+- `default_exchange`: Preferred trading exchange
+- `risk_tolerance`: Risk level (LOW, MEDIUM, HIGH, VERY_HIGH)
+- `max_position_size_percent`: Maximum position size as percentage
+- `enable_ai_trading`: AI trading automation flag
+- `enable_notifications`: Notification preferences flag
+
+**API Access**
+- `api_key`: User's API key for external access
+- `api_key_expires_at`: API key expiration timestamp
+
+**Administrative**
+- `notes`: Administrative notes about the user
+
+#### Methods
+
+- `get_full_name()`: Returns formatted full name
+- `is_account_locked()`: Checks if account is currently locked
+- `can_trade()`: Determines if user is eligible for trading
+- `increment_failed_login()`: Manages failed login attempts
+- `reset_failed_login()`: Resets failed login counter
+
+#### Relationships
+
+- **One-to-Many**: Portfolios, Orders, Positions, AI Commands
+- **One-to-One**: Telegram Users
+
+## Trading Models
+
+### TradingPair Model
+
+Defines supported cryptocurrency trading pairs.
+
+#### Fields
+
+- `symbol`: Trading pair symbol (e.g., "BTCUSDT")
+- `base_currency`: Base currency (e.g., "BTC")
+- `quote_currency`: Quote currency (e.g., "USDT")
+- `exchange`: Exchange where pair is traded
+- `is_active`: Whether pair is currently tradeable
+- `min_order_size`: Minimum order size
+- `max_order_size`: Maximum order size
+- `price_precision`: Decimal precision for prices
+- `quantity_precision`: Decimal precision for quantities
+
+### Portfolio Model
+
+Manages user trading portfolios across different exchanges.
+
+#### Fields
+
+**Basic Information**
+- `user_id`: Owner of the portfolio
+- `name`: Portfolio name
+- `description`: Portfolio description
+- `exchange`: Associated exchange
+- `is_default`: Default portfolio flag
+- `is_paper_trading`: Paper trading mode flag
+
+**Financial Tracking**
+- `initial_balance`: Starting balance
+- `current_balance`: Current available balance
+- `total_pnl`: Total profit/loss
+- `daily_pnl`: Daily profit/loss
+
+#### Relationships
+
+- **Belongs to**: User
+- **Has many**: Positions, Orders
+
+### Order Model
+
+Tracks all trading orders with comprehensive metadata.
+
+#### Fields
+
+**Basic Order Information**
+- `user_id`: Order owner
+- `portfolio_id`: Associated portfolio
+- `trading_pair_id`: Trading pair
+- `exchange_order_id`: Exchange-specific order ID
+
+**Order Details**
+- `order_type`: Enum (MARKET, LIMIT, STOP_LOSS, TAKE_PROFIT, etc.)
+- `order_side`: Enum (BUY, SELL)
+- `order_status`: Enum (PENDING, FILLED, CANCELLED, REJECTED, etc.)
+
+**Quantities and Prices**
+- `quantity`: Order quantity
+- `filled_quantity`: Amount filled
+- `order_price`: Order price (for limit orders)
+- `stop_price`: Stop price (for stop orders)
+- `average_fill_price`: Average execution price
+- `total_cost`: Total order cost
+- `fees`: Trading fees
+
+**AI Integration**
+- `is_ai_generated`: Whether order was generated by AI
+- `ai_confidence`: AI confidence score (0.0-1.0)
+- `ai_reasoning`: AI's reasoning for the order
+
+**Timestamps**
+- `placed_at`: When order was placed
+- `filled_at`: When order was filled
+- `cancelled_at`: When order was cancelled
+- `expires_at`: Order expiration time
+
+### Position Model
+
+Tracks open and closed trading positions.
+
+#### Fields
+
+**Position Information**
+- `user_id`: Position owner
+- `portfolio_id`: Associated portfolio
+- `trading_pair_id`: Trading pair
+- `position_side`: Enum (LONG, SHORT)
+- `position_status`: Enum (OPEN, CLOSED, PARTIALLY_CLOSED)
+
+**Financial Details**
+- `quantity`: Position size
+- `average_entry_price`: Average entry price
+- `current_price`: Current market price
+- `unrealized_pnl`: Unrealized profit/loss
+- `realized_pnl`: Realized profit/loss
+- `total_fees`: Total fees paid
+
+**Risk Management**
+- `stop_loss_price`: Stop loss level
+- `take_profit_price`: Take profit level
+- `margin_used`: Margin used (for leveraged positions)
+- `leverage`: Position leverage
+
+**Timestamps**
+- `opened_at`: Position opening time
+- `closed_at`: Position closing time
+
+## AI and Machine Learning Models
+
+### AICommand Model
+
+Tracks user requests and AI processing pipeline.
+
+#### Fields
+
+**Command Information**
+- `user_id`: User who issued the command
+- `command_type`: Enum (ANALYSIS, PREDICTION, SIGNAL_GENERATION, etc.)
+- `command_status`: Enum (PENDING, PROCESSING, COMPLETED, FAILED)
+
+**Input Processing**
+- `input_text`: Original user input
+- `processed_input`: Cleaned/processed input
+- `detected_intent`: AI-detected user intent
+- `extracted_entities`: Extracted entities (JSON)
+- `confidence_score`: Intent detection confidence
+
+**Processing Metadata**
+- `processing_time_ms`: Processing time in milliseconds
+- `model_version`: AI model version used
+- `context_data`: Additional context (JSON)
+- `parameters`: Processing parameters (JSON)
+
+**Error Handling**
+- `error_message`: Error description
+- `error_code`: Categorized error code
+
+**Timestamps**
+- `started_at`: Processing start time
+- `completed_at`: Processing completion time
+
+#### Relationships
+
+- **Belongs to**: User
+- **Has many**: AI Responses, Trading Signals
+
+### AIResponse Model
+
+Stores AI-generated responses and feedback.
+
+#### Fields
+
+**Response Content**
+- `ai_command_id`: Associated command
+- `response_text`: Generated response text
+- `structured_data`: Structured response data (JSON)
+- `confidence_score`: Response confidence
+
+**Generation Metadata**
+- `model_version`: Model version used
+- `tokens_used`: Token consumption
+- `generation_time_ms`: Generation time
+
+**Quality Metrics**
+- `relevance_score`: Response relevance
+- `helpfulness_score`: Response helpfulness
+- `user_rating`: User feedback rating
+- `user_feedback`: User feedback text
+
+### TradingSignal Model
+
+Stores AI-generated trading recommendations.
+
+#### Fields
+
+**Signal Information**
+- `ai_command_id`: Source AI command
+- `trading_pair_id`: Target trading pair
+- `signal_type`: Enum (BUY, SELL, HOLD)
+- `signal_source`: Enum (TECHNICAL_ANALYSIS, NEWS_SENTIMENT, etc.)
+
+**Signal Strength**
+- `confidence_score`: Signal confidence (0.0-1.0)
+- `signal_strength`: Signal strength (WEAK, MODERATE, STRONG)
+
+**Price Targets**
+- `entry_price`: Recommended entry price
+- `target_price`: Price target
+- `stop_loss_price`: Stop loss recommendation
+
+**Risk Management**
+- `risk_reward_ratio`: Risk/reward ratio
+- `max_risk_percent`: Maximum risk percentage
+
+**Analysis Details**
+- `reasoning`: AI reasoning for the signal
+- `supporting_indicators`: Supporting technical indicators
+- `market_conditions`: Current market conditions
+- `time_horizon`: Signal time horizon
+- `expires_at`: Signal expiration time
+
+## Market Data Models
+
+### MarketData Model
+
+Stores OHLCV (Open, High, Low, Close, Volume) market data.
+
+#### Fields
+
+**Data Identification**
+- `trading_pair_id`: Associated trading pair
+- `exchange`: Data source exchange
+- `timeframe`: Enum (1m, 5m, 15m, 1h, 4h, 1d, etc.)
+- `timestamp`: Data timestamp
+
+**OHLCV Data**
+- `open_price`: Opening price
+- `high_price`: Highest price
+- `low_price`: Lowest price
+- `close_price`: Closing price
+- `volume`: Trading volume
+- `quote_volume`: Quote asset volume
+
+**Additional Metrics**
+- `number_of_trades`: Number of trades
+- `taker_buy_volume`: Taker buy volume
+- `taker_buy_quote_volume`: Taker buy quote volume
+- `price_change`: Price change
+- `price_change_percent`: Price change percentage
+- `vwap`: Volume Weighted Average Price
+
+**Data Quality**
+- `is_complete`: Data completeness flag
+- `data_source`: Data source identifier
+
+#### Relationships
+
+- **Belongs to**: Trading Pair
+- **Has many**: Technical Indicators
+
+### TechnicalIndicator Model
+
+Stores calculated technical indicators.
+
+#### Fields
+
+**Indicator Information**
+- `market_data_id`: Source market data
+- `trading_pair_id`: Associated trading pair
+- `indicator_type`: Enum (RSI, MACD, SMA, EMA, BOLLINGER_BANDS, etc.)
+- `timeframe`: Indicator timeframe
+- `timestamp`: Calculation timestamp
+
+**Indicator Values**
+- `value`: Primary indicator value
+- `values`: Multiple values for complex indicators (JSON)
+- `parameters`: Calculation parameters (JSON)
+
+**Signal Information**
+- `signal`: Trading signal (buy/sell/hold)
+- `signal_strength`: Signal strength (0.0-1.0)
+
+**Calculation Metadata**
+- `calculation_method`: Method used
+- `data_points_used`: Number of data points
+
+### NewsArticle Model
+
+Stores cryptocurrency news and analysis.
+
+#### Fields
+
+**Article Content**
+- `title`: Article title
+- `content`: Full article content
+- `summary`: Article summary
+- `url`: Article URL (unique)
+- `source`: News source
+- `author`: Article author
+
+**Categorization**
+- `category`: Enum (GENERAL, TECHNICAL, REGULATORY, etc.)
+- `tags`: Article tags (JSON)
+- `published_at`: Publication timestamp
+
+**Sentiment Analysis**
+- `sentiment`: Enum (POSITIVE, NEGATIVE, NEUTRAL)
+- `sentiment_score`: Sentiment score (-1.0 to 1.0)
+- `impact_score`: Market impact score
+
+**Relevance**
+- `mentioned_symbols`: Mentioned trading symbols
+- `relevance_score`: Content relevance score
+
+## Telegram Integration Models
+
+### TelegramUser Model
+
+Manages Telegram bot users and their preferences.
+
+#### Fields
+
+**User Identity**
+- `user_id`: Associated application user (nullable)
+- `telegram_id`: Telegram user ID (unique)
+- `username`: Telegram username
+- `first_name`: Telegram first name
+- `last_name`: Telegram last name
+- `language_code`: User's language preference
+
+**Status and Settings**
+- `status`: Enum (ACTIVE, BLOCKED, BANNED, PENDING)
+- `is_bot_blocked`: Whether user blocked the bot
+- `notifications_enabled`: Notification preferences
+- `notification_types`: Specific notification types (JSON)
+
+**Preferences**
+- `timezone`: User's timezone
+- `preferred_currency`: Display currency preference
+
+**Activity Tracking**
+- `total_messages`: Total messages sent
+- `total_commands`: Total commands executed
+- `last_activity_at`: Last activity timestamp
+
+**Registration**
+- `registration_code`: Code for account linking
+- `is_verified`: Verification status
+- `verified_at`: Verification timestamp
+
+**Rate Limiting**
+- `daily_message_count`: Messages sent today
+- `last_message_date`: Last message date
+
+#### Methods
+
+- `display_name`: Returns formatted display name
+- `can_send_message()`: Checks rate limiting
+
+### TelegramMessage Model
+
+Stores all Telegram messages for analysis and tracking.
+
+#### Fields
+
+**Message Identity**
+- `telegram_user_id`: Message sender
+- `message_id`: Telegram message ID
+- `chat_id`: Telegram chat ID
+- `message_type`: Enum (TEXT, COMMAND, PHOTO, etc.)
+
+**Content**
+- `text`: Message text content
+- `message_data`: Additional data (JSON)
+- `reply_to_message_id`: Reply reference
+- `forward_from_chat_id`: Forward source
+- `forward_from_message_id`: Forward reference
+
+**Processing Status**
+- `is_processed`: Processing flag
+- `processed_at`: Processing timestamp
+
+**AI Analysis**
+- `detected_intent`: AI-detected intent
+- `extracted_entities`: Extracted entities (JSON)
+- `sentiment_score`: Message sentiment
+
+**Response Tracking**
+- `bot_response_sent`: Response status
+- `bot_response_message_id`: Bot's response ID
+
+**Timestamps**
+- `telegram_timestamp`: Original Telegram timestamp
+
+### TelegramCommand Model
+
+Tracks bot command execution and results.
+
+#### Fields
+
+**Command Information**
+- `telegram_user_id`: Command issuer
+- `message_id`: Source message ID
+- `chat_id`: Chat ID
+- `command`: Command name
+- `arguments`: Command arguments
+- `parsed_arguments`: Parsed arguments (JSON)
+
+**Processing Status**
+- `status`: Enum (RECEIVED, PROCESSING, COMPLETED, FAILED, CANCELLED)
+- `processing_started_at`: Start timestamp
+- `processing_completed_at`: Completion timestamp
+- `processing_time_ms`: Processing duration
+
+**Results**
+- `result_data`: Execution results (JSON)
+- `response_text`: Bot response
+- `response_message_id`: Response message ID
+
+**Error Handling**
+- `error_message`: Error description
+- `error_code`: Error categorization
+
+**Integration**
+- `ai_command_id`: Associated AI command
+- `execution_count`: Usage counter
+
+## Model Relationships
+
+### Primary Relationships
+
+1. **User → Portfolios** (One-to-Many)
+2. **User → Orders** (One-to-Many)
+3. **User → Positions** (One-to-Many)
+4. **User → AI Commands** (One-to-Many)
+5. **User → Telegram Users** (One-to-Many)
+
+6. **Portfolio → Orders** (One-to-Many)
+7. **Portfolio → Positions** (One-to-Many)
+
+8. **Trading Pair → Orders** (One-to-Many)
+9. **Trading Pair → Positions** (One-to-Many)
+10. **Trading Pair → Market Data** (One-to-Many)
+11. **Trading Pair → Technical Indicators** (One-to-Many)
+
+12. **AI Command → AI Responses** (One-to-Many)
+13. **AI Command → Trading Signals** (One-to-Many)
+14. **AI Command → Telegram Commands** (One-to-One)
+
+15. **Market Data → Technical Indicators** (One-to-Many)
+
+16. **Telegram User → Messages** (One-to-Many)
+17. **Telegram User → Commands** (One-to-Many)
+
+### Cross-Service Relationships
+
+- **AI Service ↔ Trading Service**: AI commands generate trading signals
+- **Telegram Service ↔ AI Service**: Telegram commands trigger AI processing
+- **Market Data ↔ AI Service**: Market data feeds AI analysis
+- **User Service ↔ All Services**: Central user management
+
+## Database Indexes and Constraints
+
+### Unique Constraints
+
+- `users.email`: Unique email addresses
+- `users.username`: Unique usernames
+- `trading_pairs.symbol + exchange`: Unique trading pairs per exchange
+- `market_data.trading_pair_id + exchange + timeframe + timestamp`: Unique market data points
+- `technical_indicators.trading_pair_id + indicator_type + timeframe + timestamp`: Unique indicators
+- `telegram_users.telegram_id`: Unique Telegram IDs
+- `news_articles.url`: Unique article URLs
+
+### Performance Indexes
+
+**User-related**
+- `users.email`: Fast login lookup
+- `users.api_key`: API authentication
+
+**Trading-related**
+- `orders.user_id + status`: User order queries
+- `positions.user_id + status`: User position queries
+- `portfolios.user_id`: User portfolio lookup
+
+**Market Data**
+- `market_data.timestamp`: Time-based queries
+- `market_data.trading_pair_id + timeframe`: Pair-specific data
+- `technical_indicators.timestamp`: Indicator time queries
+
+**AI and Analysis**
+- `ai_commands.user_id + status`: User command tracking
+- `trading_signals.trading_pair_id + expires_at`: Active signals
+
+**Telegram**
+- `telegram_users.telegram_id`: Fast Telegram lookup
+- `telegram_messages.telegram_user_id + telegram_timestamp`: Message history
+
+### Foreign Key Constraints
+
+All relationships are enforced with foreign key constraints to maintain data integrity. Cascade delete is configured appropriately:
+
+- **CASCADE**: Child records deleted with parent (e.g., user deletion removes all associated data)
+- **RESTRICT**: Prevents deletion if child records exist (e.g., cannot delete trading pair with active orders)
+- **SET NULL**: Sets foreign key to null on parent deletion (e.g., optional relationships)
+
+## Data Validation and Business Rules
+
+### User Management
+- Email format validation
+- Password strength requirements
+- Unique username/email enforcement
+- Account lock after failed login attempts
+
+### Trading
+- Order quantity within trading pair limits
+- Sufficient balance validation
+- Position size limits based on risk tolerance
+- Stop loss/take profit price validation
+
+### Market Data
+- Timestamp uniqueness per trading pair/timeframe
+- Price validation (positive values)
+- Volume validation (non-negative)
+
+### AI Processing
+- Confidence score range (0.0-1.0)
+- Signal expiration validation
+- Processing timeout limits
+
+### Telegram Integration
+- Daily message limits
+- Command rate limiting
+- User verification requirements
+
+This comprehensive model structure ensures data integrity, performance, and scalability while supporting all the system's core functionalities.
