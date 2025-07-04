@@ -1286,6 +1286,47 @@ echo "Backup completed successfully"
    kubectl scale deployment worker --replicas=2
    ```
 
+## Docker Build Issues
+
+### Quick Solutions for Common Build Problems
+
+If you encounter Docker build failures, try these solutions:
+
+#### 1. Use Build Scripts
+```bash
+# Linux/macOS
+./build.sh
+
+# Windows
+build.bat
+```
+
+#### 2. TA-Lib Installation Issues
+The most common build failure is related to TA-Lib. Our Dockerfile now includes:
+- Pre-installation of TA-Lib C library
+- System dependencies for compilation
+- Staged installation approach
+
+#### 3. Memory Issues
+- Increase Docker Desktop memory to 4GB+
+- Close other applications during build
+- Use `docker system prune -a` to free space
+
+#### 4. Network Issues
+- Ensure stable internet connection
+- Retry with: `docker-compose build --no-cache`
+- Use build scripts with automatic retry logic
+
+#### 5. Dependency Conflicts
+We've split requirements into:
+- `requirements-base.txt` - Essential packages
+- `requirements-ai.txt` - AI/ML packages  
+- `requirements.txt` - Complete package list
+
+### Detailed Troubleshooting
+
+For comprehensive troubleshooting, see: [Docker Troubleshooting Guide](docker-troubleshooting.md)
+
 ## Troubleshooting
 
 ### Common Issues

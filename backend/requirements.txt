@@ -24,6 +24,8 @@ scikit-learn==1.3.2
 nltk==3.8.1
 torch==2.1.1
 torchvision==0.16.1
+joblib==1.3.2
+scipy==1.11.4
 
 # Message Queue
 celery==5.3.4
@@ -63,7 +65,6 @@ click==8.1.7
 pytest==7.4.3
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
-httpx==0.25.2
 factory-boy==3.3.0
 
 # Development

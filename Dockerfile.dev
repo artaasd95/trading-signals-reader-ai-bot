@@ -8,17 +8,33 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONPATH=/app
 
-# Install system dependencies
+# Install system dependencies including TA-Lib requirements
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     git \
+    wget \
     libpq-dev \
     gcc \
     g++ \
+    gfortran \
+    libatlas-base-dev \
+    liblapack-dev \
+    libblas-dev \
     vim \
     htop \
     && rm -rf /var/lib/apt/lists/*
+
+# Install TA-Lib C library
+RUN cd /tmp && \
+    wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz && \
+    tar -xzf ta-lib-0.4.0-src.tar.gz && \
+    cd ta-lib/ && \
+    ./configure --prefix=/usr && \
+    make && \
+    make install && \
+    cd / && \
+    rm -rf /tmp/ta-lib*
 
 # Create app directory
 WORKDIR /app
